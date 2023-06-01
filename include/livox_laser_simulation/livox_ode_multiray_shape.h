@@ -22,8 +22,6 @@ class GZ_PHYSICS_VISIBLE LivoxOdeMultiRayShape : public MultiRayShape{
     // Documentation inherited.
     public: virtual void UpdateRays();
 
-    public: virtual void Init();
-
     public: std::vector<RayShapePtr> &RayShapes(){return rays;}
     /// \brief Ray-intersection callback.
     /// \param[in] _data Pointer to user data.

@@ -117,17 +117,15 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     rayShape->Load(sdfPtr);
     rayShape->Init();
 
-
-    auto offset = laserCollision->RelativePose();
     ignition::math::Vector3d start_point, end_point;
+    ignition::math::Quaterniond ray;
     for (int j = 0; j < samplesStep; j += downSample) {
         int index = j % maxPointSize;
         auto &rotate_info = aviaInfos[index];
-        ignition::math::Quaterniond ray;
         ray.Euler(ignition::math::Vector3d(0.0, rotate_info.zenith, rotate_info.azimuth));
-        auto axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-        start_point = minDist * axis + offset.Pos();
-        end_point = maxDist * axis + offset.Pos();
+        auto axis = laserCollision->RelativePose().Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
+        start_point = minDist * axis + laserCollision->RelativePose().Pos();
+        end_point = maxDist * axis + laserCollision->RelativePose().Pos();
         rayShape->AddRay(start_point, end_point);
     }
 
@@ -164,6 +162,7 @@ void LivoxPointsPlugin::OnNewLaserScans() {
         auto range = rayShape->GetRange(pair.first);
         auto intensity = rayShape->GetRetro(pair.first);
         auto rotate_info = pair.second;
+
 
         if (range < RangeMin() || range > RangeMax()) 
             range = std::nan("1");
@@ -261,7 +260,7 @@ double LivoxPointsPlugin::GetRangeMin() const { return RangeMin(); }
 
 double LivoxPointsPlugin::RangeMin() const {
     if (rayShape)
-        return rayShape->GetMinRange();
+        return rayShape->GetMinRange(); //
     else
         return -1;
 }
