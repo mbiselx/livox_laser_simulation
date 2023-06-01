@@ -1,10 +1,12 @@
 # Livox Laser Simulation
 A package to provide plug-in for [Livox Series LiDAR](https://www.livoxtech.com).
 
+***Note : I have forked this package and modified it to suit my needs -- specifically, I am interested in simulating the HAP lidar a little more realistically on ROS Noetic (this is a WIP). In order for this to work the way I wanted it, I had to do some changes which are not suitable for merging back into the main repo.***
+
 ## Requirements
-- ROS(=Melodic)
-- Gazebo (= 9.x, http://gazebosim.org/)
-- Ubuntu(=18.04)
+- ROS(=Noetic)
+- Gazebo (= 11.x, http://gazebosim.org/)
+- Ubuntu(=20.04)
 
 ## Results
 - avia
