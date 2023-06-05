@@ -49,7 +49,7 @@ void convertDataToRotateInfo(const std::vector<std::vector<double>> &datas, std:
     }
 }
 
-void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr sdf) {
+void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr _sdf) {
 
     // initialize gazebo node 
     node = transport::NodePtr(new transport::Node());
@@ -62,11 +62,11 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     rosNode.reset(new ros::NodeHandle);
 
     // initialize plugin 
-    RayPlugin::Load(_parent, sdf);
+    RayPlugin::Load(_parent, _sdf);
 
     // load scan pattern description csv file 
     std::vector<std::vector<double>> datas;
-    std::string file_name = sdf->Get<std::string>("csv_file_name");
+    std::string file_name = _sdf->Get<std::string>("csv_file_name");
     ROS_INFO_STREAM("load csv file name:" << file_name);
     if (!CsvReader::ReadCsvFile(file_name, datas)) {
         ROS_FATAL_STREAM("cannot get csv file : " << file_name);
@@ -79,7 +79,7 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     parentEntity = this->world->EntityByName(raySensor->ParentName());
 
     // read parameters from sdf
-    sdfPtr = sdf;
+    sdfPtr = _sdf;
     auto rayElem = sdfPtr->GetElement("ray");
     auto scanElem = rayElem->GetElement("scan");
     auto rangeElem = rayElem->GetElement("range");
@@ -97,14 +97,9 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
 
     // gazebo scan publisher
     scanPub = node->Advertise<msgs::LaserScanStamped>(raySensor->Topic(), 50);
-    laserMsg.mutable_scan()->set_frame(raySensor->Name());
 
     // ros scan publisher
     rosPointPub = rosNode->advertise<sensor_msgs::PointCloud2>(curr_scan_topic, 5);
-
-    // send TF between sensor and base 
-    // Note : don't do this because it's cheating 
-    // SendRosTf(raySensor->Pose(), parentEntity->GetName(), raySensor->Name());
 
     // create the laser collisions calulator
     laserCollision = world->Physics()->CreateCollision("multiray", raySensor->ParentName());
@@ -113,111 +108,86 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     laserCollision->SetInitialRelativePose(raySensor->Pose());
     rayShape.reset(new gazebo::physics::LivoxOdeMultiRayShape(laserCollision));
     laserCollision->SetShape(rayShape);
-    rayShape->RayShapes().reserve(samplesStep / downSample);
+    rayShape->RayShapes().reserve(samplesStep);
     rayShape->Load(sdfPtr);
     rayShape->Init();
-
-    ignition::math::Vector3d start_point, end_point;
-    ignition::math::Quaterniond ray;
-    for (int j = 0; j < samplesStep; j += downSample) {
-        int index = j % maxPointSize;
-        auto &rotate_info = aviaInfos[index];
-        ray.Euler(ignition::math::Vector3d(0.0, rotate_info.zenith, rotate_info.azimuth));
-        auto axis = laserCollision->RelativePose().Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-        start_point = minDist * axis + laserCollision->RelativePose().Pos();
-        end_point = maxDist * axis + laserCollision->RelativePose().Pos();
-        rayShape->AddRay(start_point, end_point);
-    }
-
-    msgs::LaserScan *scan = laserMsg.mutable_scan();
-    InitializeScan(scan);
 }
 
 void LivoxPointsPlugin::OnNewLaserScans() {
+    RayPlugin::OnNewLaserScans();
+
     if (!rayShape) 
         return; // can't do anything if rayShape has not been initialized yet
 
-    std::vector<std::pair<int, AviaRotateInfo>> points_pair;
-    InitializeRays(points_pair, rayShape);
+    sensor_msgs::PointCloud2::Ptr ros_scan_point(new sensor_msgs::PointCloud2);
+
+    // update ray positions
+    InitializeRays();
+
+    // update ray collisions
     rayShape->Update();
 
-    // update time
-    msgs::Set(laserMsg.mutable_time(), world->SimTime());
+    // prepare gazebo message for visualization
+    // InitializeScan();
 
+    // place collision points from the updated rays into pointcloud
+    RetrieveCollisionPointCloud(ros_scan_point);
 
-    // send TF between sensor and base 
-    // Note : don't do this because it's cheating 
-    // SendRosTf(raySensor->Pose(), parentEntity->GetName(), raySensor->Name());
-    // SendRosTf(parentEntity->WorldPose(), world->Name(), raySensor->Name());
-
-    static int seq_cnt = 0;
-    pcl::PointXYZI pcl_point; 
-    pcl::PointCloud<pcl::PointXYZI>::Ptr scan_points(new pcl::PointCloud<pcl::PointXYZI>());
-    scan_points->header.stamp = laserMsg.time().sec()*1000 + laserMsg.time().nsec()/1e6;
-    scan_points->header.seq = seq_cnt++;
-    scan_points->header.frame_id = laserMsg.scan().frame();
-
-    for (auto &pair : points_pair) {
-
-        auto range = rayShape->GetRange(pair.first);
-        auto intensity = rayShape->GetRetro(pair.first);
-        auto rotate_info = pair.second;
-
-
-        if (range < RangeMin() || range > RangeMax()) 
-            range = std::nan("1");
-
-        ignition::math::Quaterniond ray;
-        ray.Euler(ignition::math::Vector3d(0.0, rotate_info.zenith, rotate_info.azimuth));
-
-        auto axis = ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-        auto point = range * axis;
-        pcl_point.x = point.X();
-        pcl_point.y = point.Y();
-        pcl_point.z = point.Z();
-        pcl_point.intensity = intensity;
-
-        scan_points->points.push_back(pcl_point);
-    }
-
-    // publish gazebo msg
-    if (scanPub && scanPub->HasConnections()) 
-        scanPub->Publish(laserMsg);
+    // publish gazebo msg for visualization
+    // Note : this makes everything slow AF
+    // if (scanPub && scanPub->HasConnections()) 
+    //     scanPub->Publish(laserMsg);
 
     // publish ros message
-    sensor_msgs::PointCloud2 ros_scan_point;
-    pcl::toROSMsg(*scan_points, ros_scan_point);
     rosPointPub.publish(ros_scan_point);
 
     // spin once for callback handling
     ros::spinOnce();
 }
 
-void LivoxPointsPlugin::InitializeRays(std::vector<std::pair<int, AviaRotateInfo>> &points_pair,
-                                       boost::shared_ptr<physics::LivoxOdeMultiRayShape> &ray_shape) {
-    auto &rays = ray_shape->RayShapes();
-    ignition::math::Vector3d start_point, end_point;
+void LivoxPointsPlugin::InitializeRays() {
+    bool create_rays = (rayShape->RayCount() < samplesStep);
+    ignition::math::Vector3d start_point, 
+                             end_point,
+                             axis, 
+                             unit_x(1.0, 0.0, 0.0);
     ignition::math::Quaterniond ray;
+
     auto offset = laserCollision->RelativePose();
-    int64_t end_index = currStartIndex + samplesStep;
-    auto ray_size = rays.size();
-    points_pair.reserve(rays.size());
-    for (int k = currStartIndex, ray_index = 0; k < end_index && ray_index < ray_size; k += downSample, ray_index++) {
-        auto index = k % maxPointSize;
-        auto &rotate_info = aviaInfos[index];
-        ray.Euler(ignition::math::Vector3d(0.0, rotate_info.zenith, rotate_info.azimuth));
-        auto axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
+
+    // update ray positions
+    for (int i = 0; i < samplesStep; i++) {
+        auto &rotate_info = aviaInfos[(currStartIndex + i) % maxPointSize];
+
+        // calculated the ray axis
+        ray.Euler(0.0, rotate_info.zenith, rotate_info.azimuth);
+        axis = offset.Rot() * ray * unit_x;
+
+        // start & end points of the ray
         start_point = minDist * axis + offset.Pos();
         end_point = maxDist * axis + offset.Pos();
-        rays[ray_index]->SetPoints(start_point, end_point);
-        points_pair.emplace_back(ray_index, rotate_info);
+
+        // create new rays / update ray info
+        if (create_rays) 
+            rayShape->AddRay(start_point, end_point);
+        else 
+            rayShape->SetRay(i, start_point, end_point);
     }
+
+    // update start index for next iteration
     currStartIndex += samplesStep;
 }
 
-void LivoxPointsPlugin::InitializeScan(msgs::LaserScan *&scan) {
+void LivoxPointsPlugin::InitializeScan() {
+
+    msgs::LaserScan* scan = laserMsg.mutable_scan();
+    bool create_rays = (scan->count() !=  rayShape->RayCount());
+    
     // Store the latest laser scans into laserMsg
+    scan->set_frame(raySensor->Name());
     msgs::Set(scan->mutable_world_pose(), raySensor->Pose() + parentEntity->WorldPose());
+    msgs::Set(laserMsg.mutable_time(), world->SimTime());
+
     scan->set_angle_min(AngleMin().Radian());
     scan->set_angle_max(AngleMax().Radian());
     scan->set_angle_step(AngleResolution());
@@ -231,15 +201,47 @@ void LivoxPointsPlugin::InitializeScan(msgs::LaserScan *&scan) {
     scan->set_range_min(RangeMin());
     scan->set_range_max(RangeMax());
 
-    scan->clear_ranges();
-    scan->clear_intensities();
+    if (create_rays) {
+        scan->clear_ranges();
+        scan->clear_intensities();
 
-    for (unsigned int j = 0; j < scan->vertical_count(); ++j) {
-        for (unsigned int i = 0; i < scan->count(); ++i) {
-            scan->add_ranges(0);
-            scan->add_intensities(0);
+        for (int i = 0; i < rayShape->RayCount(); i++) {
+            scan->add_ranges(rayShape->GetRange(i));
+            scan->add_intensities(rayShape->GetRetro(i));
         }
     }
+    else {
+        for (int i = 0; i < rayShape->RayCount(); i++) {
+            scan->set_ranges(i, rayShape->GetRange(i));
+            scan->set_intensities(i, rayShape->GetRetro(i));
+        }
+    }
+
+}
+
+void LivoxPointsPlugin::RetrieveCollisionPointCloud(sensor_msgs::PointCloud2::Ptr point_cloud){
+    pcl::PointXYZI pcl_point; 
+    pcl::PointCloud<pcl::PointXYZI>::Ptr scan_points(new pcl::PointCloud<pcl::PointXYZI>());
+
+    static int seq_cnt = 0; // pointcloud message counter
+    auto offset = laserCollision->RelativePose();
+    for (int i = 0; i < rayShape->RayCount(); i++) {
+
+        auto point = rayShape->Ray(i)->End() - offset.Pos();
+        pcl_point.x = point.X();
+        pcl_point.y = point.Y();
+        pcl_point.z = point.Z();
+
+        auto intensity = rayShape->GetRetro(i);
+        pcl_point.intensity = intensity;
+
+        scan_points->points.push_back(pcl_point);
+    }
+    scan_points->header.stamp = ros::Time::now().toSec()+1e6;
+    scan_points->header.seq = seq_cnt++;
+    scan_points->header.frame_id = raySensor->Name();
+
+    pcl::toROSMsg(*scan_points, *point_cloud);
 }
 
 ignition::math::Angle LivoxPointsPlugin::AngleMin() const {
@@ -276,7 +278,9 @@ double LivoxPointsPlugin::RangeMax() const {
 
 double LivoxPointsPlugin::GetAngleResolution() const { return AngleResolution(); }
 
-double LivoxPointsPlugin::AngleResolution() const { return (AngleMax() - AngleMin()).Radian() / (RangeCount() - 1); }
+double LivoxPointsPlugin::AngleResolution() const { 
+    return (AngleMax() - AngleMin()).Radian() / (RangeCount() - 1); 
+}
 
 double LivoxPointsPlugin::GetRangeResolution() const { return RangeResolution(); }
 
@@ -342,6 +346,7 @@ double LivoxPointsPlugin::GetVerticalAngleResolution() const { return VerticalAn
 double LivoxPointsPlugin::VerticalAngleResolution() const {
     return (VerticalAngleMax() - VerticalAngleMin()).Radian() / (VerticalRangeCount() - 1);
 }
+
 void LivoxPointsPlugin::SendRosTf(const ignition::math::Pose3d &pose, const std::string &father_frame,
                                   const std::string &child_frame) {
     if (!tfBroadcaster) {

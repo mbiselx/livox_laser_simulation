@@ -22,7 +22,7 @@ class LivoxPointsPlugin : public RayPlugin {
 
     virtual ~LivoxPointsPlugin();
 
-    void Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf);
+    void Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf); 
 
  private:
     ignition::math::Angle AngleMin() const;
@@ -72,11 +72,13 @@ class LivoxPointsPlugin : public RayPlugin {
  protected:
     virtual void OnNewLaserScans();
 
- private:
-    void InitializeRays(std::vector<std::pair<int, AviaRotateInfo>>& points_pair,
-                        boost::shared_ptr<physics::LivoxOdeMultiRayShape>& ray_shape);
 
-    void InitializeScan(msgs::LaserScan*& scan);
+ private:
+    void InitializeRays();
+
+    void InitializeScan();
+
+    void RetrieveCollisionPointCloud(sensor_msgs::PointCloud2::Ptr point_cloud);
 
     void SendRosTf(const ignition::math::Pose3d& pose, const std::string& father_frame, const std::string& child_frame);
 

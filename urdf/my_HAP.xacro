@@ -16,7 +16,7 @@
       </inertial>
   </xacro:macro>
 
-  <xacro:macro name="Livox_HAP_gazebo_sensor" params="visualize:=True update_rate:=10 resolution:=0.002 noise_mean:=0.0 noise_stddev:=0.01 name:=livox">
+  <xacro:macro name="Livox_HAP_gazebo_sensor" params="name:=livox visualize:=True update_rate:=10 resolution:=0.002 noise_mean:=0.0 noise_stddev:=0.01">
     <gazebo reference="${name}">
       <sensor type="ray" name="${name}_lidar">
         <pose>0 0 0 0 0 0</pose>
@@ -61,7 +61,7 @@
   </xacro:macro>
 
 
-  <xacro:macro name="Livox_HAP" params="visualize:=True name:=livox">
+  <xacro:macro name="Livox_HAP" params="name:=livox visualize:=True">
     <link name="${name}_base">
       <xacro:null_inertial/>
       <visual> 
@@ -91,5 +91,5 @@
     <xacro:Livox_HAP_gazebo_sensor name="${name}" visualize="${visualize}"/>
   </xacro:macro>
 
-  <xacro:Livox_HAP name="livox"/>
+  <xacro:Livox_HAP name="livox" />
 </robot>

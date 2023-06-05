@@ -15,7 +15,7 @@
     <arg name="verbose" value="true"/>
   </include>
   
-  <param name="sensor_description" command="$(find xacro)/xacro --inorder $(arg livox_sensor)" />
+  <param name="sensor_description" command="$(find xacro)/xacro $(arg livox_sensor)" />
   <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf -model livox_lidar -param sensor_description" />
   
   <group if="$(arg rviz)">
