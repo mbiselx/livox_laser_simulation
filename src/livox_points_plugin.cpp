@@ -50,6 +50,7 @@ void convertDataToRotateInfo(const std::vector<std::vector<double>> &datas, std:
 }
 
 void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr _sdf) {
+    RayPlugin::Load(_parent, _sdf);
 
     // initialize gazebo node 
     node = transport::NodePtr(new transport::Node());
@@ -60,9 +61,6 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     char **argv = nullptr;
     ros::init(argc, argv, _parent->Name());
     rosNode.reset(new ros::NodeHandle);
-
-    // initialize plugin 
-    RayPlugin::Load(_parent, _sdf);
 
     // load scan pattern description csv file 
     std::vector<std::vector<double>> datas;
@@ -110,7 +108,7 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     laserCollision->SetShape(rayShape);
     rayShape->RayShapes().reserve(samplesStep);
     rayShape->Load(sdfPtr);
-    rayShape->Init();
+    // rayShape->Init();
 }
 
 void LivoxPointsPlugin::OnNewLaserScans() {
@@ -127,11 +125,11 @@ void LivoxPointsPlugin::OnNewLaserScans() {
     // update ray collisions
     rayShape->Update();
 
-    // prepare gazebo message for visualization
-    // InitializeScan();
-
     // place collision points from the updated rays into pointcloud
     RetrieveCollisionPointCloud(ros_scan_point);
+
+    // prepare gazebo message for visualization
+    // InitializeScan();
 
     // publish gazebo msg for visualization
     // Note : this makes everything slow AF
@@ -139,7 +137,8 @@ void LivoxPointsPlugin::OnNewLaserScans() {
     //     scanPub->Publish(laserMsg);
 
     // publish ros message
-    rosPointPub.publish(ros_scan_point);
+    if (rosPointPub && rosPointPub.getNumSubscribers() > 0) 
+        rosPointPub.publish(ros_scan_point);
 
     // spin once for callback handling
     ros::spinOnce();
@@ -227,10 +226,17 @@ void LivoxPointsPlugin::RetrieveCollisionPointCloud(sensor_msgs::PointCloud2::Pt
     auto offset = laserCollision->RelativePose();
     for (int i = 0; i < rayShape->RayCount(); i++) {
 
-        auto point = rayShape->Ray(i)->End() - offset.Pos();
-        pcl_point.x = point.X();
-        pcl_point.y = point.Y();
-        pcl_point.z = point.Z();
+        if (rayShape->GetRange(i) < RangeMax()) {
+            auto point = rayShape->Ray(i)->End() - offset.Pos();
+            pcl_point.x = point.X();
+            pcl_point.y = point.Y();
+            pcl_point.z = point.Z();
+        }
+        else {
+            pcl_point.x = std::nan("");
+            pcl_point.y = std::nan("");
+            pcl_point.z = std::nan("");
+        }
 
         auto intensity = rayShape->GetRetro(i);
         pcl_point.intensity = intensity;

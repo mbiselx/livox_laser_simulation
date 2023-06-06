@@ -75,6 +75,7 @@ void LivoxOdeMultiRayShape::UpdateRays()
 //////////////////////////////////////////////////
 void LivoxOdeMultiRayShape::UpdateCallback(void *_data, dGeomID _o1, dGeomID _o2)
 {
+    dGeomID ray, object;
     dContactGeom contact;
     LivoxOdeMultiRayShape *self = NULL;
 
@@ -125,24 +126,40 @@ void LivoxOdeMultiRayShape::UpdateCallback(void *_data, dGeomID _o1, dGeomID _o2
         // that the ODE dRayClass is used *soley* by the RayCollision.
         if (dGeomGetClass(_o1) == dRayClass)
         {
+            ray = _o1; 
+            object = _o2;
             rayCollision = static_cast<ODECollision*>(collision1);
             hitCollision = static_cast<ODECollision*>(collision2);
-            dGeomRaySetParams(_o1, 0, 0);
-            dGeomRaySetClosestHit(_o1, 1);
-        }
+        }        
         else if (dGeomGetClass(_o2) == dRayClass)
         {
-            GZ_ASSERT(rayCollision == NULL, "rayCollision is not null");
+            ray = _o2; 
+            object = _o1;
             rayCollision = static_cast<ODECollision*>(collision2);
             hitCollision = static_cast<ODECollision*>(collision1);
-            dGeomRaySetParams(_o2, 0, 0);
-            dGeomRaySetClosestHit(_o2, 1);
         }
+        dGeomRaySetParams(ray, 0, 0);
+        dGeomRaySetClosestHit(ray, 1);
 
         // Check for ray/collision intersections
         if (rayCollision && hitCollision)
         {
-            int n = dCollide(_o1, _o2, 1, &contact, sizeof(contact));
+            // Calling dCollide between a ray and another geom will result in 
+            //  at most one contact point. Rays have their own conventions for 
+            //  the contact information in the dContactGeom structure (thus it 
+            //  is not useful to create contact joints from this information):
+            //  * `pos`     - This is the point at which the ray intersects the 
+            //                  surface of the other geom, regardless of whether 
+            //                  the ray starts from inside or outside the geom.
+            //  * `normal`  - This is the surface normal of the other geom at 
+            //                  the contact point. if dCollide is passed the ray 
+            //                  as its first geom then the normal will be oriented 
+            //                  correctly for ray reflection from that surface 
+            //                  (otherwise it will have the opposite sign).
+            //  * `depth`   - This is the distance from the start of the ray to
+            //                  the contact point.
+            // (source: wiki)[http://ode.org/wikiold/htmlfile17.html]
+            int n = dCollide(object, ray, 1, &contact, sizeof(contact));
 
             if (n > 0)
             {
@@ -150,19 +167,17 @@ void LivoxOdeMultiRayShape::UpdateCallback(void *_data, dGeomID _o1, dGeomID _o2
                     rayCollision->GetShape());
                 if (contact.depth < shape->GetLength())
                 {
-                    // gzerr << "LivoxOdeMultiRayShape UpdateCallback dSpaceCollide2 "
-                    //      << " depth[" << contact.depth << "]"
-                    //      << " position[" << contact.pos[0]
-                    //        << ", " << contact.pos[1]
-                    //        << ", " << contact.pos[2]
-                    //        << ", " << "]"
-                    //      << " ray[" << rayCollision->GetScopedName() << "]"
-                    //      << " pose[" << rayCollision->GetWorldPose() << "]"
-                    //      << " hit[" << hitCollision->GetScopedName() << "]"
-                    //      << " pose[" << hitCollision->GetWorldPose() << "]"
-                    //      << "\n";
+                    // set ray length
                     shape->SetLength(contact.depth);
-                    shape->SetRetro(hitCollision->GetLaserRetro());
+
+                    // set ray reflection, made up of diffuse + specular 
+                    // assumption: lidar's internal signal processing filters distance + ambiant light effects 
+                    auto axis = (shape->End() - shape->Start()).Normalized();
+                    double dot = contact.normal[0]*axis[0] + 
+                                 contact.normal[1]*axis[1] + 
+                                 contact.normal[2]*axis[2];
+
+                    shape->SetRetro((1 + dot) * hitCollision->GetLaserRetro());
                 }
             }
         }

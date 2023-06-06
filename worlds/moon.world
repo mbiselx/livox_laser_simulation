@@ -175,6 +175,7 @@
           </geometry>
         </visual>
         <collision name='collison'>
+          <laser_retro>100.0</laser_retro>
           <geometry>
             <cylinder>
               <length>0.6</length>

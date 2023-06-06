@@ -65,13 +65,13 @@
     <link name="${name}_base">
       <xacro:null_inertial/>
       <visual> 
-        <origin xyz="-0.0445 0 0.032.5" rpy="0 ${pi/2} 0" />
+        <origin xyz="-0.0445 0 0.0325" rpy="0 ${pi/2} 0" />
         <geometry>
           <mesh filename="package://livox_laser_simulation/meshes/livox_HAP.dae" scale=".001 .001 .001" />
         </geometry>
       </visual>
       <collision>
-		    <origin xyz="-0.0445 0 0.032.5" rpy="0 0 0" /> 
+		    <origin xyz="-0.0445 0 0.0325" rpy="0 0 0" /> 
         <geometry> 
           <box size="0.105 0.1316 0.065"/>
         </geometry>

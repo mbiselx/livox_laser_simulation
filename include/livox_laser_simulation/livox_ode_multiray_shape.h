@@ -41,8 +41,6 @@ class GZ_PHYSICS_VISIBLE LivoxOdeMultiRayShape : public MultiRayShape{
     /// \brief Ray space for collision detector.
     private: dSpaceID raySpaceId;
 
- private:
-    std::vector<RayShapePtr> livoxRays;
 };
 }
 }
