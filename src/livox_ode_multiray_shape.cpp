@@ -167,17 +167,22 @@ void LivoxOdeMultiRayShape::UpdateCallback(void *_data, dGeomID _o1, dGeomID _o2
                     rayCollision->GetShape());
                 if (contact.depth < shape->GetLength())
                 {
+                    // set ray reflection, made up of diffuse + specular 
+                    // assumption: lidar's internal signal processing removes distance + ambiant light effects 
+                    auto _sdf = hitCollision->GetSDF();
+                    double diff = _sdf->Get<double>("laser_retro"); 
+                    double spec = _sdf->Get<double>("laser_spec"); 
+                    if (spec > 0) {
+                        auto axis = (shape->End() - shape->Start()).Normalized();
+                        double dot = contact.normal[0]*axis[0] + 
+                                     contact.normal[1]*axis[1] + 
+                                     contact.normal[2]*axis[2];
+                        spec *= dot; 
+                    }
+                    shape->SetRetro(diff + spec);
+
                     // set ray length
                     shape->SetLength(contact.depth);
-
-                    // set ray reflection, made up of diffuse + specular 
-                    // assumption: lidar's internal signal processing filters distance + ambiant light effects 
-                    auto axis = (shape->End() - shape->Start()).Normalized();
-                    double dot = contact.normal[0]*axis[0] + 
-                                 contact.normal[1]*axis[1] + 
-                                 contact.normal[2]*axis[2];
-
-                    shape->SetRetro((1 + dot) * hitCollision->GetLaserRetro());
                 }
             }
         }

@@ -74,7 +74,7 @@
     
     <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose frame=''>331.267 -126.678 301.183 0 0.627643 2.55455</pose>
+        <pose frame=''>15 -5 7 0 0.627643 2.55455</pose>
         <view_controller>orbit</view_controller>
         <projection_type>perspective</projection_type>
       </camera>
@@ -112,7 +112,7 @@
           <pose frame=''>0 -0.1 0.01 0 -0 0</pose>
           <geometry>
             <box>
-              <size>0.5 0.35 0.02</size>
+              <size>0.5 0.35 0.001</size>
             </box>
           </geometry>
           <max_contacts>10</max_contacts>
@@ -163,7 +163,7 @@
       </link>
     </model>
 
-    <model name='cylinder'>
+    <model name='cylinder_diffuse'>
       <pose frame=''>3 -3 0 0 0 0</pose>
       <link name="base_link">
         <visual name='visual'>
@@ -176,6 +176,41 @@
         </visual>
         <collision name='collison'>
           <laser_retro>100.0</laser_retro>
+          <geometry>
+            <cylinder>
+              <length>0.6</length>
+              <radius>0.2</radius>
+            </cylinder>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass>10</mass>
+          <inertia>
+            <ixx>0.4</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.4</iyy>
+            <iyz>0</iyz>
+            <izz>0.2</izz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+
+    <model name='cylinder_shiny'>
+      <pose frame=''>3 -2 0 0 0 0</pose>
+      <link name="base_link">
+        <visual name='visual'>
+          <geometry>
+            <cylinder>
+              <length>0.6</length>
+              <radius>0.2</radius>
+            </cylinder>
+          </geometry>
+        </visual>
+        <collision name='collison'>
+          <laser_retro>100.0</laser_retro> <!-- this reprensents the diffuse retroreflection-->
+          <laser_spec>50.0</laser_spec> <!-- this represents the specular retroreflection-->
           <geometry>
             <cylinder>
               <length>0.6</length>
