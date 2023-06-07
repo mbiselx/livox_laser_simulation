@@ -8,10 +8,9 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   tf
+  gazebo
+  PCL
 )
-
-find_package(gazebo REQUIRED)
-find_package(PCL REQUIRED)
 
 include_directories(
   include
@@ -25,8 +24,8 @@ include_directories(/usr/include/gazebo-7/gazebo)
 
 link_directories(
   include
-  ${PCL_LIBRARY_DIRS}
   ${GAZEBO_LIBRARY_DIRS}
+  ${PCL_LIBRARY_DIRS}
 )
 
 #This is designed for whose proto installed in system is not 2.6. We can install the version of proto in local dir
@@ -34,10 +33,10 @@ link_directories(
 #link_directories(/home/lfc/proto/lib/)
 
 catkin_package(
-  CATKIN_DEPENDS roscpp sensor_msgs tf
-  DEPENDS PCL
   INCLUDE_DIRS include
   LIBRARIES livox_laser_simulation
+  CATKIN_DEPENDS roscpp sensor_msgs tf
+  DEPENDS PCL
 )
 
 add_library(livox_laser_simulation SHARED src/livox_points_plugin.cpp src/livox_ode_multiray_shape.cpp)

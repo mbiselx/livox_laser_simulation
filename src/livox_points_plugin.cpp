@@ -99,7 +99,7 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     // ros scan publisher
     rosPointPub = rosNode->advertise<sensor_msgs::PointCloud2>(curr_scan_topic, 5);
 
-    // create the laser collisions calulator
+    // create the laser collisions calculator
     laserCollision = world->Physics()->CreateCollision("multiray", raySensor->ParentName());
     laserCollision->SetName("ray_sensor_collision");
     laserCollision->SetRelativePose(raySensor->Pose());
