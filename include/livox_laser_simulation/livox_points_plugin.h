@@ -4,13 +4,19 @@
 
 #ifndef SRC_GAZEBO_LIVOX_POINTS_PLUGIN_H
 #define SRC_GAZEBO_LIVOX_POINTS_PLUGIN_H
-#include <ros/node_handle.h>
-#include <tf/transform_broadcaster.h>
+
+#include <ros/ros.h>
+#include <ros/callback_queue.h>
+#include <ros/advertise_options.h>
+
+#include <gazebo/transport/Node.hh>
 #include <gazebo/plugins/RayPlugin.hh>
-#include "livox_ode_multiray_shape.h"
+#include <gazebo/physics/MultiRayShape.hh>
+#include <gazebo/sensors/Noise.hh>
 
 namespace gazebo {
-struct AviaRotateInfo {
+
+struct RayRotationInfo {
     double time;
     double azimuth;
     double zenith;
@@ -24,85 +30,53 @@ class LivoxPointsPlugin : public RayPlugin {
 
     void Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf); 
 
- private:
-    ignition::math::Angle AngleMin() const;
 
-    ignition::math::Angle AngleMax() const;
+   protected:
+      void ConnectCb();
 
-    double GetAngleResolution() const GAZEBO_DEPRECATED(7.0);
+      void OnScan(ConstLaserScanStampedPtr& _msg);
 
-    double AngleResolution() const;
+      // void OnNewLaserScans();
 
-    double GetRangeMin() const GAZEBO_DEPRECATED(7.0);
+      void UpdateRays();
 
-    double RangeMin() const;
+   private: 
+      // parent ray sensor 
+      sensors::RaySensorPtr parent_sensor;
 
-    double GetRangeMax() const GAZEBO_DEPRECATED(7.0);
+      // sdf element related to this plugin
+      sdf::ElementPtr sdfPtr;
 
-    double RangeMax() const;
+      // gazebo node handle
+      transport::NodePtr gz_node;
 
-    double GetRangeResolution() const GAZEBO_DEPRECATED(7.0);
+      // ROS node handle
+      ros::NodeHandle* ros_node;
 
-    double RangeResolution() const;
+      // gazebo laser scan subscriber
+      transport::SubscriberPtr gz_sub;
 
-    int GetRayCount() const GAZEBO_DEPRECATED(7.0);
+      // ROS pointcloud publisher
+      ros::Publisher ros_pub;
 
-    int RayCount() const;
+      // ROS topic on which to publish the pointcloud
+      std::string topic_name;
 
-    int GetRangeCount() const GAZEBO_DEPRECATED(7.0);
+      // frame of the ROS pointcloud
+      std::string frame_name;
 
-    int RangeCount() const;
+      // container for rays
+      physics::MultiRayShapePtr ray_shape;
+      std::vector<RayRotationInfo> ray_rotations;
 
-    int GetVerticalRayCount() const GAZEBO_DEPRECATED(7.0);
+      // Custom Callback Queue
+      ros::CallbackQueue laser_queue_;
+      void laserQueueThread();
+      boost::thread callback_laser_queue_thread_;
 
-    int VerticalRayCount() const;
+      int64_t samples_step = 0;
+      int64_t current_samples_idx = 0;
 
-    int GetVerticalRangeCount() const GAZEBO_DEPRECATED(7.0);
-
-    int VerticalRangeCount() const;
-
-    ignition::math::Angle VerticalAngleMin() const;
-
-    ignition::math::Angle VerticalAngleMax() const;
-
-    double GetVerticalAngleResolution() const GAZEBO_DEPRECATED(7.0);
-
-    double VerticalAngleResolution() const;
-
- protected:
-    virtual void OnNewLaserScans();
-
-
- private:
-    void InitializeRays();
-
-    void InitializeScan();
-
-    void RetrieveCollisionPointCloud(sensor_msgs::PointCloud2::Ptr point_cloud);
-
-    void SendRosTf(const ignition::math::Pose3d& pose, const std::string& father_frame, const std::string& child_frame);
-
-    boost::shared_ptr<physics::LivoxOdeMultiRayShape> rayShape;
-    gazebo::physics::CollisionPtr laserCollision;
-    physics::EntityPtr parentEntity;
-    transport::PublisherPtr scanPub;
-    sdf::ElementPtr sdfPtr;
-    msgs::LaserScanStamped laserMsg;
-    transport::NodePtr node;
-    gazebo::sensors::SensorPtr raySensor;
-    std::vector<AviaRotateInfo> aviaInfos;
-
-    std::shared_ptr<ros::NodeHandle> rosNode;
-    ros::Publisher rosPointPub;
-    std::shared_ptr<tf::TransformBroadcaster> tfBroadcaster;
-
-    int64_t samplesStep = 0;
-    int64_t currStartIndex = 0;
-    int64_t maxPointSize = 1000;
-    int64_t downSample = 1;
-
-    double maxDist = 400.0;
-    double minDist = 0.1;
 };
 
 }  // namespace gazebo

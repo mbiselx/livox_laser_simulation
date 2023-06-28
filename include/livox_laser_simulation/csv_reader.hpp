@@ -14,34 +14,37 @@ class CsvReader {
  public:
     static bool ReadCsvFile(std::string file_name, std::vector<std::vector<double>>& datas) {
         std::fstream file_stream;
+        std::string header, line_str, value;
+        std::vector<double> data;
+
+        // open file
         file_stream.open(file_name, std::ios::in);
-        if (file_stream.is_open()) {
-            std::string header;
-            std::getline(file_stream, header, '\n');
-            while (!file_stream.eof()) {
-                std::string line_str;
-                std::getline(file_stream, line_str, '\n');
-                std::stringstream line_stream;
-                line_stream << line_str;
-                std::vector<double> data;
-                try {
-                    while (!line_stream.eof()) {
-                        std::string value;
-                        std::getline(line_stream, value, ',');
-                        data.push_back(std::stod(value));
-                    }
-                } catch (...) {
-                    std::cerr << "cannot convert str:" << line_str << "\n";
-                    continue;
-                }
-                datas.push_back(data);
-            }
-            std::cerr << "data size:" << datas.size() << "\n";
-            return true;
-        } else {
+        if (!file_stream.is_open()){
             std::cerr << "cannot read csv file!" << file_name << "\n";
+            return false;
         }
-        return false;
+    
+        // discard header
+        std::getline(file_stream, header, '\n');
+
+        // get values by line
+        while (std::getline(file_stream, line_str, '\n')) {
+            std::stringstream line_stream(line_str);
+            data.clear();
+            try {
+                while (std::getline(line_stream, value, ',')) 
+                    data.push_back(std::stod(value));
+                
+            } catch (...) {
+                std::cerr << "cannot convert str:" << line_str << "\n";
+                continue;
+            }
+            datas.push_back(data);
+        }
+
+        std::cout << "data size:" << datas.size() << "\n";
+        return true;
+
     }
 };
 
