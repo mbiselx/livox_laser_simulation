@@ -118,6 +118,7 @@ void LivoxPointsPlugin::UpdateRays() {
     ignition::math::Quaterniond ray;
 
     auto offset = this->parent_sensor->Pose();
+    bool was_active = this->parent_sensor->IsActive();
 
     // update ray positions
     this->parent_sensor->SetActive(false); // lock the sensor while we're modifying it
@@ -139,7 +140,7 @@ void LivoxPointsPlugin::UpdateRays() {
         else 
             this->ray_shape->AddRay(start_point, end_point);
     }
-    this->parent_sensor->SetActive(true); // unlock the sensor 
+    this->parent_sensor->SetActive(was_active); // restore sensor state 
 
     // update start index for next iteration
     this->current_samples_idx += this->samples_step;
@@ -166,6 +167,7 @@ void LivoxPointsPlugin::ConnectCb()
 
 // translate gazebo message to ROS pointcloud message
 void LivoxPointsPlugin::OnScan(ConstLaserScanStampedPtr& _msg) {
+    gzdbg << "scan" << std::endl;
 
     // Populate message fields
     sensor_msgs::PointCloud2 msg;
